@@ -1,6 +1,6 @@
 package debitoor
 
-type Customer struct {
+type CustomerPatchV1 struct {
 	Address string `json:"address,omitempty"`
 	CiNumber string `json:"ciNumber,omitempty"`
 	CountryCode string `json:"countryCode,omitempty"`

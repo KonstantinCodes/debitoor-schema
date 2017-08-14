@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var typeOrder = [4]string{"object", "string", "number", "boolean"}
+var typeOrder = [5]string{"object", "string", "number", "integer", "boolean"}
 
 func main() {
 	flag.Parse()
@@ -140,7 +140,7 @@ func convertObject(objectMessage json.RawMessage) json.RawMessage {
 }
 
 func getMostImportantType(typeParameter json.RawMessage) json.RawMessage {
-	if strings.Contains(string(typeParameter), ",") {
+	if strings.Contains(string(typeParameter), "[") {
 		marshalledType := json.RawMessage{}
 
 		var typeParameterArray []string
