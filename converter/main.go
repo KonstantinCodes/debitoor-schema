@@ -49,6 +49,12 @@ func convertObject(objectMessage json.RawMessage) json.RawMessage {
 	var required []string
 	var properties map[string]*json.RawMessage
 
+	if _, ok := object["type"]; ok {
+		mostImportantType := json.RawMessage{}
+		mostImportantType = getMostImportantType(*object["type"])
+		newObject["type"] = &mostImportantType
+	}
+
 	if _, ok := object["properties"]; !ok {
 		return objectMessage // if properties is missing, exit
 	}
@@ -152,10 +158,31 @@ func getMostImportantType(typeParameter json.RawMessage) json.RawMessage {
 			return marshalledType
 		}
 
-		// TODO Multiple types like "string" and "number"
-		marshalledType, _ = json.Marshal(typeParameterArrayWithoutNull)
+		// Multiple types like "string" and "number" in one type field
+		var bestMatch string
+		for _, to := range typeOrder {
+			if containsType(typeParameterArrayWithoutNull, to) {
+				bestMatch = to
+				break
+			}
+		}
+
+		if len(bestMatch) == 0 {
+			panic("couldnt pick a type")
+		}
+
+		marshalledType, _ = json.Marshal(bestMatch)
 		return marshalledType
 	}
 
 	return typeParameter
+}
+
+func containsType(types []string, search string) bool {
+	for _, currentType := range types {
+		if currentType == search {
+			return true
+		}
+	}
+	return false
 }
