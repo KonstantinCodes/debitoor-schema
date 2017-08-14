@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var typeOrder = [4]string{"object", "string", "number", "boolean"}
+
 func main() {
 	flag.Parse()
 
@@ -100,6 +102,11 @@ func convertObject(objectMessage json.RawMessage) json.RawMessage {
 			delete(property, "required")
 		}
 
+		if _, ok := property["type"]; ok {
+			mostImportantType := json.RawMessage{}
+			mostImportantType = getMostImportantType(*property["type"])
+			property["type"] = &mostImportantType
+		}
 
 		newpropertyData := json.RawMessage{}
 		newpropertyData, _ = json.Marshal(property)
@@ -124,4 +131,31 @@ func convertObject(objectMessage json.RawMessage) json.RawMessage {
 	marshalledNewObject, err = json.Marshal(newObject)
 
 	return marshalledNewObject
+}
+
+func getMostImportantType(typeParameter json.RawMessage) json.RawMessage {
+	if strings.Contains(string(typeParameter), ",") {
+		marshalledType := json.RawMessage{}
+
+		var typeParameterArray []string
+		json.Unmarshal(typeParameter, &typeParameterArray)
+
+		var typeParameterArrayWithoutNull []string
+		for _, currentType := range typeParameterArray {
+			if currentType != "null" {
+				typeParameterArrayWithoutNull = append(typeParameterArrayWithoutNull, currentType)
+			}
+		}
+
+		if len(typeParameterArrayWithoutNull) == 1 {
+			marshalledType, _ = json.Marshal(typeParameterArrayWithoutNull[0])
+			return marshalledType
+		}
+
+		// TODO Multiple types like "string" and "number"
+		marshalledType, _ = json.Marshal(typeParameterArrayWithoutNull)
+		return marshalledType
+	}
+
+	return typeParameter
 }
