@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"encoding/json"
+	"strings"
 )
 
 func main() {
@@ -13,43 +14,79 @@ func main() {
 
 	files, _ := ioutil.ReadDir("./schema")
 	for _, f := range files {
-		b, err := ioutil.ReadFile("./schema/" + f.Name())
 
+		if !strings.HasSuffix(f.Name(), ".json") {
+			continue
+		}
+
+		b, err := ioutil.ReadFile("./schema/" + f.Name())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed to read the input file with error ", err)
 			return
 		}
 
-		var object map[string]*json.RawMessage
-		json.Unmarshal(b, &object)
+		fmt.Println("File: " + f.Name())
+		newObject := convertObject(b)
 
-		var required []string
-		var properties map[string]*json.RawMessage
+		ioutil.WriteFile("./schema-processed/" + f.Name(), newObject, 0644)
+	}
+}
 
-		if _, ok := object["properties"]; !ok {
-			continue // if properties is missing
-		}
-		err = json.Unmarshal(*object["properties"], &properties)
-		if err != nil {
-			fmt.Println(err)
-		}
+func convertObject(objectMessage json.RawMessage) json.RawMessage {
+	var object map[string]*json.RawMessage
+	json.Unmarshal(objectMessage, &object)
 
+	// Create Copy of object
+	newObject := make(map[string]*json.RawMessage)
+	for k2,v2 := range object {
+		newObject[k2] = v2
+	}
 
-		// Create Copy
-		newProperties := make(map[string]*json.RawMessage)
-		for k2,v2 := range properties {
-			newProperties[k2] = v2
-		}
+	// START PROCESSING
 
-		for propertyName, propertyData := range properties {
-			var property map[string]*json.RawMessage
-			err = json.Unmarshal(*propertyData, &property)
+	var required []string
+	var properties map[string]*json.RawMessage
 
-			var requiredParameter bool
-			requiredParameter = true
-			if _, ok := property["required"]; !ok {
-				continue // if required is missing
+	if _, ok := object["properties"]; !ok {
+		return objectMessage // if properties is missing, exit
+	}
+	err := json.Unmarshal(*object["properties"], &properties)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Create Copy
+	newProperties := make(map[string]*json.RawMessage)
+	for k2,v2 := range properties {
+		newProperties[k2] = v2
+	}
+
+	for propertyName, propertyData := range properties {
+		var property map[string]*json.RawMessage
+		err = json.Unmarshal(*propertyData, &property)
+
+		// RECURSION CHECK
+		if strings.Contains(string(*property["type"]), "array") { // ARRAYS ---
+			if _, ok := property["items"]; !ok {
+				panic("no items in array type!")
 			}
+
+			marshalledNewItems := json.RawMessage{}
+			marshalledNewItems = convertObject(*property["items"])
+			property["items"] = &marshalledNewItems
+		}
+
+		if strings.Contains(string(*property["type"]), "object") { // Nested Objects
+			marshalledNewProperty := json.RawMessage{}
+			marshalledNewProperty = convertObject(*propertyData)
+			newProperties[propertyName] = &marshalledNewProperty
+
+			continue
+		}
+		// RECURSION CHECK END
+
+		if _, ok := property["required"]; ok {
+			requiredParameter := true
 			err = json.Unmarshal(*property["required"], &requiredParameter)
 			if err != nil {
 				fmt.Println(err)
@@ -61,36 +98,30 @@ func main() {
 			}
 
 			delete(property, "required")
-
-			newpropertyData := json.RawMessage{}
-			newpropertyData, _ = json.Marshal(property)
-
-			newProperties[propertyName] = &newpropertyData
 		}
 
-		// Create Copy of object
-		newObject := make(map[string]*json.RawMessage)
-		for k2,v2 := range object {
-			newObject[k2] = v2
-		}
 
-		marshalledSchema := json.RawMessage{}
-		marshalledSchema, err = json.Marshal("http://json-schema.org/draft-04/schema")
+		newpropertyData := json.RawMessage{}
+		newpropertyData, _ = json.Marshal(property)
 
-		marshalledNewProperties := json.RawMessage{}
-		marshalledNewProperties, err = json.Marshal(newProperties)
-
-		marshalledNewRequired := json.RawMessage{}
-		marshalledNewRequired, err = json.Marshal(required)
-
-		newObject["$schema"] = &marshalledSchema
-		newObject["required"] = &marshalledNewRequired
-		newObject["properties"] = &marshalledNewProperties
-
-		marshalledNewObject, err := json.Marshal(newObject)
-
-		fmt.Println(string(marshalledNewObject))
-
-		ioutil.WriteFile("./schema-processed/" + f.Name(), marshalledNewObject, 0644)
+		newProperties[propertyName] = &newpropertyData
 	}
+
+	marshalledSchema := json.RawMessage{}
+	marshalledSchema, err = json.Marshal("http://json-schema.org/draft-04/schema")
+
+	marshalledNewProperties := json.RawMessage{}
+	marshalledNewProperties, err = json.Marshal(newProperties)
+
+	marshalledNewRequired := json.RawMessage{}
+	marshalledNewRequired, err = json.Marshal(required)
+
+	newObject["$schema"] = &marshalledSchema
+	newObject["required"] = &marshalledNewRequired
+	newObject["properties"] = &marshalledNewProperties
+
+	marshalledNewObject := json.RawMessage{}
+	marshalledNewObject, err = json.Marshal(newObject)
+
+	return marshalledNewObject
 }
