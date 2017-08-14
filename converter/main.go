@@ -68,18 +68,22 @@ func main() {
 			newProperties[propertyName] = &newpropertyData
 		}
 
-		marshalledNewProperties := json.RawMessage{}
-		marshalledNewProperties, err = json.Marshal(newProperties)
-
-		marshalledNewRequired := json.RawMessage{}
-		marshalledNewRequired, err = json.Marshal(required)
-
 		// Create Copy of object
 		newObject := make(map[string]*json.RawMessage)
 		for k2,v2 := range object {
 			newObject[k2] = v2
 		}
 
+		marshalledSchema := json.RawMessage{}
+		marshalledSchema, err = json.Marshal("http://json-schema.org/draft-04/schema")
+
+		marshalledNewProperties := json.RawMessage{}
+		marshalledNewProperties, err = json.Marshal(newProperties)
+
+		marshalledNewRequired := json.RawMessage{}
+		marshalledNewRequired, err = json.Marshal(required)
+
+		newObject["$schema"] = &marshalledSchema
 		newObject["required"] = &marshalledNewRequired
 		newObject["properties"] = &marshalledNewProperties
 
