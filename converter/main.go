@@ -90,5 +90,7 @@ func main() {
 		marshalledNewObject, err := json.Marshal(newObject)
 
 		fmt.Println(string(marshalledNewObject))
+
+		ioutil.WriteFile("./schema-processed/" + f.Name(), marshalledNewObject, 0644)
 	}
 }
